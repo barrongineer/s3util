@@ -1,4 +1,5 @@
-// Copyright © 2017 NAME HERE <EMAIL ADDRESS>
+// Copyright © 2018 NAME HERE <EMAIL ADDRESS>
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -14,51 +15,33 @@
 package cmd
 
 import (
-	"io/ioutil"
+	"fmt"
 
-	"bytes"
-	"net/http"
-
-	"github.com/aws/aws-sdk-go/aws"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"github.com/aws/aws-sdk-go/aws"
 )
 
-// putCmd represents the put command
-var putCmd = &cobra.Command{
-	Use:   "put",
-	Short: "Upsert a resource in S3",
-	Long: `Example:
-	s3util put --key path/to/something/cool.exe --file ./cool.exe`,
+// listCmd represents the list command
+var listCmd = &cobra.Command{
+	Use:   "list",
+	Short: "A brief description of your command",
+	Long: `A longer description that spans multiple lines and likely contains examples
+and usage of using your command. For example:
+
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		endpoint := viper.GetString("endpoint")
 		bucket := viper.GetString("bucket")
 		key := viper.GetString("key")
-		filename := viper.GetString("file")
 		id := viper.GetString("id")
 		secret := viper.GetString("secret")
 		region := viper.GetString("region")
-
-		data, err := ioutil.ReadFile(filename)
-		if err != nil {
-			return err
-		}
-
-		contentType := http.DetectContentType(data)
-		body := bytes.NewReader(data)
-		size := int64(len(data))
-		encryption := "aws:kms"
-		input := &s3.PutObjectInput{
-			Bucket:               &bucket,
-			Key:                  &key,
-			Body:                 body,
-			ContentLength:        &size,
-			ContentType:          &contentType,
-			ServerSideEncryption: &encryption,
-		}
 
 		creds := credentials.NewStaticCredentials(id, secret, "")
 		cfg := aws.NewConfig().
@@ -68,9 +51,17 @@ var putCmd = &cobra.Command{
 			WithS3ForcePathStyle(true)
 		s := session.Must(session.NewSession())
 		s3Client := s3.New(s, cfg)
-		_, err = s3Client.PutObject(input)
+
+		input := s3.ListObjectsInput{
+			Bucket: &bucket,
+			Prefix: &key,
+		}
+		output, err := s3Client.ListObjects(&input)
 		if err != nil {
 			return err
+		}
+		for _, obj := range output.Contents {
+			fmt.Println(obj.String())
 		}
 
 		return nil
@@ -78,21 +69,15 @@ var putCmd = &cobra.Command{
 }
 
 func init() {
-	RootCmd.AddCommand(putCmd)
+	RootCmd.AddCommand(listCmd)
 
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// putCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// listCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// putCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-
-	putCmd.PersistentFlags().StringP("key", "k", "", "key to use for the file")
-	viper.BindPFlag("key", putCmd.PersistentFlags().Lookup("key"))
-
-	putCmd.PersistentFlags().StringP("file", "f", "", "local path to the file")
-	viper.BindPFlag("file", putCmd.PersistentFlags().Lookup("file"))
+	// listCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
